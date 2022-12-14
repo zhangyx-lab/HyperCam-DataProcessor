@@ -1,0 +1,7 @@
+# System files
+.DS_Store
+# VS Code files
+.vscode
+# Data contents
+data
+calib_*
