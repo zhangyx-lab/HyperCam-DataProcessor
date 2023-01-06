@@ -2,6 +2,9 @@
 .DS_Store
 # VS Code files
 .vscode
+# Python Cache
+__pycache__
 # Data contents
+var
 data
 calib_*
