@@ -19,10 +19,12 @@ COLORS = [
 BASE = Path(dirname(realpath(__file__)))
 # Path constants
 VAR_PATH = BASE / "var"
-RAW_PATH = BASE / "data" / "raw"
-REF_PATH = BASE / "data" / "reference"
-CALIBRATED_PATH = BASE / "data" / "calibrated"
-ALIGNED_PATH = BASE / "data" / "aligned"
+DATA_PATH = BASE / "data"
+RAW_PATH = DATA_PATH / "raw"
+REF_PATH = DATA_PATH / "reference"
+REPORT_PATH = DATA_PATH / "report.txt"
+CALIBRATED_PATH = DATA_PATH / "calibrated"
+ALIGNED_PATH = DATA_PATH / "aligned"
 # Create paths if not exist
 for path in [VAR_PATH, CALIBRATED_PATH, ALIGNED_PATH]:
     if not exists(path):

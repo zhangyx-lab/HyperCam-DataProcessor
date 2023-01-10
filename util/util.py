@@ -3,13 +3,25 @@ from os.path import basename
 import re
 from sys import stderr
 from math import floor, ceil, log
-from numpy import ndarray, squeeze, concatenate, average, ones, uint8, float32
+from numpy import ndarray, squeeze, concatenate, average, ones, uint8, float32, absolute
 from cv2 import resize as cv_resize, imread, cvtColor, COLOR_BGR2GRAY
 
 
 def rdGray(path: Path) -> ndarray:
     img = imread(str(path))
     return cvtColor(img, COLOR_BGR2GRAY)
+
+
+def contrast(img: ndarray, c: float = 1.0):
+    img = img.astype(float32)
+    img = 2 * img / 255 - 1
+    mask = img < 0
+    img = absolute(img)
+    img = img ** (1 / c)
+    img = 255 * (img + 1) / 2
+    img = img.astype(uint8)
+    img[mask] = 255 - img[mask]
+    return img
 
 
 def gamma(img: ndarray, g: float = -1.0) -> ndarray:

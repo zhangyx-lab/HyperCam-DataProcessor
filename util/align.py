@@ -9,6 +9,7 @@ import numpy as np
 # User custom packages
 from util.util import rdGray, pad, resize, gamma, gammaAlign
 from util.refImage import load
+from util.score import score as getScore
 # Kernel size constant
 SAVE_PATH = env.ALIGNED_PATH
 SIZE = env.KERNEL_SIZE
@@ -28,9 +29,10 @@ def getKernel(stack: np.ndarray) -> np.ndarray:
 
 
 def apply(id):
-    log = open(env.VAR_PATH / "align.txt", 'a')
+    log = open(env.REPORT_PATH, 'a')
     stack = loadKernelStack(id)
     kernel = getKernel(stack)
+    kernel = gamma(cv.equalizeHist(kernel), 2)
     # Find best match (highest confidence)
     best_score = 0
     best_pos = (0, 0)
@@ -38,6 +40,7 @@ def apply(id):
     for refFile in env.REF_IMAGES:
         refId = basename(refFile)
         ref = rdGray(env.VAR_PATH / "REF_{}.png".format(refId))
+        ref = gamma(cv.equalizeHist(ref), 2)
         # Run template matching
         match = cv.matchTemplate(ref, kernel, cv.TM_CCOEFF_NORMED)
         (H, W) = match.shape
@@ -51,30 +54,36 @@ def apply(id):
             best_id = refId
     # Global matching finished
     (Y, X) = best_pos
-    print("{} => ({:3d}, {:3d}) of {}, score = {:.4f}".format(
-        id.ljust(3), Y, X, best_id, best_score), file=log)
-    # Save matched data point
     ref_match = load(best_id)[Y:Y+SIZE, X:X+SIZE, :]
+    # Report score of the best match
+    match_score, match_diff = getScore(ref_match[:, :, 100:160], kernel)
+    print("{} => ({:3d}, {:3d}) of {}, score = {:.4f} ({:.4f})".format(
+        id.ljust(3), Y, X, best_id, match_score, best_score), file=log)
+    cv.imwrite(str(SAVE_PATH / "{}_diff.png".format(id)), match_diff)
+    # Save matched data point
     np.save(SAVE_PATH / "{}_ref".format(id), ref_match)
     np.save(SAVE_PATH / id, stack)
     # Save a picture for manual inspection
     h, w, d = stack.shape
-    kernel_rgb = np.concatenate(
-        [stack[:, :, _].reshape((h, w, 1)) for _ in [6, 2, 1]],
+    kernel_rgb = np.stack(
+        # [stack[:, :, _] for _ in [6, 2, 1]],
+        [kernel for _ in range(3)],
         axis=2
     )
     kernel_rgb = cv.resize(kernel_rgb, (SIZE, SIZE))
     ref_rgb = cv.imread(str(env.REF_PATH / "{}.png".format(best_id)))
-    P = 0.7
-    for i in range(3):
-        layer = (gamma(kernel_rgb[:, :, i]).astype(np.float32) / 255) * 2 - 1
-        layer[layer > 0] = layer[layer > 0] ** P
-        layer[layer < 0] = -((-layer[layer < 0]) ** P)
-        kernel_rgb[:, :, i] = (255 * (layer + 1) / 2).astype(np.uint8)
-    kernel_rgb[:, :] = gammaAlign(kernel_rgb[:, :], ref_rgb[:, :])
-    for i in range(3):
-        ref_rgb[:, :, i] = gammaAlign(ref_rgb[:, :, i], kernel_rgb[:, :, i])
-    ref_roi = ref_rgb[Y:Y+SIZE, X:X+SIZE, :]
+    # P = 0.7
+    # for i in range(3):
+    #     layer = (gamma(kernel_rgb[:, :, i]).astype(np.float32) / 255) * 2 - 1
+    #     layer[layer > 0] = layer[layer > 0] ** P
+    #     layer[layer < 0] = -((-layer[layer < 0]) ** P)
+    #     kernel_rgb[:, :, i] = (255 * (layer + 1) / 2).astype(np.uint8)
+    # kernel_rgb[:, :] = gammaAlign(kernel_rgb[:, :], ref_rgb[:, :])
+    # for i in range(3):
+    #     ref_rgb[:, :, i] = gammaAlign(ref_rgb[:, :, i], kernel_rgb[:, :, i])
+    ref_roi = np.average(ref_rgb[Y:Y+SIZE, X:X+SIZE, :], axis=2).astype(np.uint8)
+    ref_roi = gamma(cv.equalizeHist(ref_roi), 2)
+    ref_roi = np.stack([ref_roi for _ in range(3)], axis=2)
     pair = (ref_roi, kernel_rgb)
     H = max(pair[0].shape[0], pair[1].shape[0])
     W = max(pair[0].shape[1], pair[1].shape[1])
