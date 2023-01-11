@@ -32,6 +32,6 @@ for path in [VAR_PATH, CALIBRATED_PATH, ALIGNED_PATH]:
 # Source image files
 CALIB_CHECKER_LIST = list(glob(str(BASE / "calib_checker" / "*.png")))
 CALIB_WHITE_LIST = list(glob(str(BASE / "calib_white" / "*.png")))
-RAW_IMAGES = list(glob(str(RAW_PATH / "*.png")))
-REF_IMAGES = [_.replace(".dat", "") for _ in glob(str(REF_PATH / "*.dat"))]
-CALIBRATED_IMAGES = list(glob(str(CALIBRATED_PATH / "*.png")))
+RAW_IMAGES = lambda: list(glob(str(RAW_PATH / "*.png")))
+REF_IMAGES = lambda: [_.replace(".dat", "") for _ in glob(str(REF_PATH / "*.dat"))]
+CALIBRATED_IMAGES = lambda: list(glob(str(CALIBRATED_PATH / "*.png")))

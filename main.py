@@ -90,13 +90,13 @@ if __name__ == '__main__':
     with get_context("spawn").Pool(processes=cpu_count()) as pool:
         # Run calibration
         print("\nRunning calibration on raw images ...")
-        launch(run_calibrate, env.RAW_IMAGES)
+        launch(run_calibrate, env.RAW_IMAGES())
         # Prepare reference images
         print("\nInitializing reference images ...")
-        launch(RefImage.init, env.REF_IMAGES)
+        launch(RefImage.init, env.REF_IMAGES())
         # Run image alignment
         print("\nAligning images to references ...")
-        launch(Align.apply, util.getIdList(env.CALIBRATED_IMAGES))
+        launch(Align.apply, util.getIdList(env.CALIBRATED_IMAGES()))
     # Sort the report
     report = open(env.REPORT_PATH, 'r').readlines()
     report.sort()

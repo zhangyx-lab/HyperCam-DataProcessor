@@ -37,7 +37,7 @@ def apply(id):
     best_score = 0
     best_pos = (0, 0)
     best_id = None
-    for refFile in env.REF_IMAGES:
+    for refFile in env.REF_IMAGES():
         refId = basename(refFile)
         ref = rdGray(env.VAR_PATH / "REF_{}.png".format(refId))
         ref = gamma(cv.equalizeHist(ref), 2)
@@ -59,9 +59,9 @@ def apply(id):
     match_score, match_diff = getScore(ref_match[:, :, 100:160], kernel)
     print("{} => ({:3d}, {:3d}) of {}, score = {:.4f} ({:.4f})".format(
         id.ljust(3), Y, X, best_id, match_score, best_score), file=log)
-    cv.imwrite(str(SAVE_PATH / "{}_diff.png".format(id)), match_diff)
+    # cv.imwrite(str(SAVE_PATH / "{}_diff.png".format(id)), match_diff)
     # Save matched data point
-    np.save(SAVE_PATH / "{}_ref".format(id), ref_match)
+    np.save(SAVE_PATH / "{}_REF".format(id), ref_match)
     np.save(SAVE_PATH / id, stack)
     # Save a picture for manual inspection
     h, w, d = stack.shape
@@ -84,33 +84,31 @@ def apply(id):
     ref_roi = np.average(ref_rgb[Y:Y+SIZE, X:X+SIZE, :], axis=2).astype(np.uint8)
     ref_roi = gamma(cv.equalizeHist(ref_roi), 2)
     ref_roi = np.stack([ref_roi for _ in range(3)], axis=2)
-    pair = (ref_roi, kernel_rgb)
-    H = max(pair[0].shape[0], pair[1].shape[0])
-    W = max(pair[0].shape[1], pair[1].shape[1])
-    COLOR2 = (192, 64, 32)
-    COLOR = (64, 32, 192)
+    row = [ref_roi, kernel_rgb, match_diff]
+    LINE_WIDTH = 6
+    H = max([_.shape[0] for _ in row]) + LINE_WIDTH
+    W = max([_.shape[1] for _ in row]) + LINE_WIDTH
+    COLORS = [(64, 32, 192), (192, 64, 32), (164, 255, 252)]
     # pair = resize(pair[0], h=H), resize(pair[1], h=H)
-    pair = (
-        pad(pair[0], h=H+6, w=W+6, color=COLOR),
-        pad(pair[1], h=H+6, w=W+6, color=COLOR2)
-    )
-    H = max(pair[0].shape[0], pair[1].shape[0])
-    W = max(pair[0].shape[1], pair[1].shape[1])
+    row = [pad(row[i], h=H, w=W, color=COLORS[i]) for i in range(len(row))]
+    # Make the margin
     MARGIN = 60
-    pair = (
-        pair[0],
+    row = [
+        row[0],
         np.zeros((H, MARGIN, 3)),
-        pair[1]
-    )
-    pair_rgb = np.concatenate(pair, axis=1)
-    H, W, D = pair_rgb.shape
-    pair_rgb = pad(pair_rgb, h=H+2*MARGIN, w=W+2*MARGIN, color=(0, 0, 0))
+        row[1],
+        np.zeros((H, MARGIN, 3)),
+        row[2]
+    ]
+    row = np.concatenate(row, axis=1)
+    H, W, D = row.shape
+    row = pad(row, h=H+2*MARGIN, w=W+2*MARGIN, color=(0, 0, 0))
     roi_rgb = cv.rectangle(np.copy(ref_rgb), (X, Y),
-                           (X+SIZE, Y+SIZE), COLOR, 3)
-    roi_rgb = resize(roi_rgb, w=pair_rgb.shape[1]-2*MARGIN)
+                           (X+SIZE, Y+SIZE), COLORS[0], 3)
+    roi_rgb = resize(roi_rgb, w=row.shape[1]-2*MARGIN)
     H, W, D = roi_rgb.shape
     roi_rgb = pad(roi_rgb, h=H+2*MARGIN, w=W+2 *
                   MARGIN, color=(0, 0, 0))[MARGIN:]
-    img = np.concatenate((pair_rgb, roi_rgb), axis=0)
-    # print(pair_rgb.shape, roi_rgb.shape, img.shape, img.dtype)
+    img = np.concatenate((row, roi_rgb), axis=0)
+    # print(row.shape, roi_rgb.shape, img.shape, img.dtype)
     cv.imwrite(str(SAVE_PATH / "{}.png".format(id)), img)
