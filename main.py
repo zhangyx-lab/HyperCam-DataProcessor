@@ -15,11 +15,12 @@ import util.undistort as Undistort
 import util.refImage as RefImage
 import util.align as Align
 import util.util as util
+import util.saveGrids as saveGrids
 # Path constants
 SAVE_PATH = env.CALIBRATED_PATH
 
 
-def check(bri_map, mtx, dist):
+def save_checker_sample(bri_map, mtx, dist):
     """Show corrected checker"""
     img_path = env.CALIB_CHECKER_LIST[0]
     img = util.rdGray(img_path)
@@ -28,25 +29,10 @@ def check(bri_map, mtx, dist):
     bri_corrected = WhiteField.apply(img, bri_map[colorIndex])
     # undistortion
     undistorted = Undistort.apply(bri_corrected, mtx=mtx, dist=dist)
-    # compute common sizes
-    img_list = [img, bri_corrected, undistorted]
-    h = max([_.shape[0] for _ in img_list])
-    w = max([_.shape[1] for _ in img_list])
-    # concat images
-    display_img = np.concatenate(
-        [util.pad(util.resize(_, h=h), color=0, h=h+10, w=w+5)
-         for _ in img_list],
-        axis=1
-    )
-    # crop the image according to AOI
-    WINDOW_NAME = "Corrected Checker"
-    cv.namedWindow(WINDOW_NAME, cv.WINDOW_AUTOSIZE)
-    cv.startWindowThread()
-    cv.imshow(WINDOW_NAME, display_img)
-    cv.setWindowProperty(WINDOW_NAME, cv.WND_PROP_TOPMOST, 1)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
-    cv.waitKey(10)
+    # output checkers to data path
+    cv.imwrite(str(env.DATA_PATH / 'checker.raw.png'), img)
+    cv.imwrite(str(env.DATA_PATH / 'checker.bri_corrected.png'), bri_corrected)
+    cv.imwrite(str(env.DATA_PATH / 'checker.undistorted.png'), undistorted)
 
 
 def run_calibrate(img_path):
@@ -62,6 +48,12 @@ def run_calibrate(img_path):
     # Save image
     cv.imwrite(str(SAVE_PATH / basename(img_path)), undistorted)
 
+
+def get_gridView(id):
+    saveGrids.apply(util.loadStack(id, env.RAW_PATH),
+                    env.GRID_VIEW_PATH / "{}_raw.png".format(id))
+    saveGrids.apply(util.loadStack(id, env.CALIBRATED_PATH),
+                    env.GRID_VIEW_PATH / "{}_cal.png".format(id))
 
 # Initiate cv2 window
 # WINDOW_NAME = "Processed Image"
@@ -85,18 +77,23 @@ if __name__ == '__main__':
     bri_map = WhiteField.init()
     mtx, dist = Undistort.init()
     # Check for calibration result
-    # check(bri_map, mtx, dist)
+    save_checker_sample(bri_map, mtx, dist)
     # ----------------------
     with get_context("spawn").Pool(processes=cpu_count()) as pool:
         # Run calibration
         print("\nRunning calibration on raw images ...")
         launch(run_calibrate, env.RAW_IMAGES())
+        # Gather ID list
+        idList = util.getIdList(env.CALIBRATED_IMAGES())
+        # Generate image grids
+        print("\nGenerating gird views ...")
+        launch(get_gridView, idList)
         # Prepare reference images
         print("\nInitializing reference images ...")
         launch(RefImage.init, env.REF_IMAGES())
         # Run image alignment
         print("\nAligning images to references ...")
-        launch(Align.apply, util.getIdList(env.CALIBRATED_IMAGES()))
+        launch(Align.apply, idList)
     # Sort the report
     report = open(env.REPORT_PATH, 'r').readlines()
     report.sort()

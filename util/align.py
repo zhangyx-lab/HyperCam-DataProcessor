@@ -7,19 +7,12 @@ from os.path import basename
 import cv2 as cv
 import numpy as np
 # User custom packages
-from util.util import rdGray, pad, resize, gamma, gammaAlign
+from util.util import loadStack, rdGray, pad, resize, gamma, gammaAlign
 from util.refImage import load
 from util.score import score as getScore
 # Kernel size constant
 SAVE_PATH = env.ALIGNED_PATH
 SIZE = env.KERNEL_SIZE
-
-
-def loadKernelStack(id: str) -> np.ndarray:
-    stack = ["{}_{}.png".format(id, _) for _ in env.COLORS]
-    stack = [rdGray(env.CALIBRATED_PATH / _) for _ in stack]
-    stack = [_.reshape((_.shape[0], _.shape[1], 1)) for _ in stack]
-    return np.concatenate(stack, axis=2)
 
 
 def getKernel(stack: np.ndarray) -> np.ndarray:
@@ -30,7 +23,7 @@ def getKernel(stack: np.ndarray) -> np.ndarray:
 
 def apply(id):
     log = open(env.REPORT_PATH, 'a')
-    stack = loadKernelStack(id)
+    stack = loadStack(id)
     kernel = getKernel(stack)
     kernel = gamma(cv.equalizeHist(kernel), 2)
     # Find best match (highest confidence)

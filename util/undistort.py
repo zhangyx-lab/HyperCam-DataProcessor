@@ -30,6 +30,7 @@ def init(SHOW_WINDOW=False):
     # Arrays to store object points and image points from all the images.
     objpoints = []  # 3d point in real world space
     imgpoints = []  # 2d points in image plane.
+    img = None
     # Initialize window thread if necessary
     if SHOW_WINDOW:
         WINDOW_NAME = "Original Image"

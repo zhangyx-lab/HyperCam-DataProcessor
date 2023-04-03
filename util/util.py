@@ -4,7 +4,55 @@ import re
 from sys import stderr
 from math import floor, ceil, log
 from numpy import ndarray, squeeze, concatenate, average, ones, uint8, float32, absolute
-from cv2 import resize as cv_resize, imread, cvtColor, COLOR_BGR2GRAY
+import numpy as np
+from cv2 import imread, cvtColor, putText, COLOR_BGR2GRAY, LINE_AA
+from cv2 import resize as cv_resize
+from cv2 import FONT_HERSHEY_DUPLEX as FONT
+import env
+
+
+def loadStack(id: str, base=env.CALIBRATED_PATH) -> np.ndarray:
+    stack = ["{}_{}.png".format(id, _) for _ in env.COLORS]
+    stack = [rdGray(base / _) for _ in stack]
+    stack = [_.reshape((_.shape[0], _.shape[1], 1)) for _ in stack]
+    return np.concatenate(stack, axis=2)
+
+
+def val_map(x, range) -> float:
+    a, b = range
+    if a > b:
+        return 1 - val_map(x, (b, a))
+    if x <= a: return float(0)
+    if x >= b: return float(1)
+    return (x - a) / (b - a)
+
+def invert(rgb):
+    return 255 - ndarray(rgb)
+
+def wave2bgr(wave, invisible=0.3):
+    def gamma(color, GAMMA):
+        return (255 * pow(color, GAMMA)).astype(uint8)
+
+    B = val_map(wave, (510, 490))
+    G = np.min([val_map(wave, (440, 490)), val_map(wave, (645, 580))])
+    R = np.max([val_map(wave, (440, 380)), val_map(wave, (510, 580))])
+
+    intensity = np.max([
+        np.min([
+            val_map(wave, (380, 420)),
+            val_map(wave, (780, 700))
+        ]),
+        invisible
+    ])
+
+    color = np.array([B, G, R], dtype=float32)
+
+    return gamma(color * intensity, 0.8)
+
+def draw_text(im, txt, pos=None, font=FONT, scale=0.5, color=(255, 255, 255), width=1):
+    if pos is None:
+        pos = (10, im.shape[0] - 10)
+    return putText(im.astype(uint8), txt, pos, font, scale, color, width, LINE_AA)
 
 
 def rdGray(path: Path) -> ndarray:
@@ -55,7 +103,7 @@ def getColorIndex(file_name):
     return result[0]
 
 
-def pad(img: ndarray, color, h: int = 0, w: int = 0) -> ndarray:
+def pad(img: ndarray, color = (255, 255, 255), h: int = 0, w: int = 0) -> ndarray:
     img = img.reshape((img.shape[0], img.shape[1], -1))
     img_h, img_w, img_d = img.shape
     # Fill in default values

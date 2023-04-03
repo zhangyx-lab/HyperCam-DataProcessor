@@ -24,9 +24,10 @@ RAW_PATH = DATA_PATH / "raw"
 REF_PATH = DATA_PATH / "reference"
 REPORT_PATH = DATA_PATH / "report.txt"
 CALIBRATED_PATH = DATA_PATH / "calibrated"
+GRID_VIEW_PATH = DATA_PATH / "gridView"
 ALIGNED_PATH = DATA_PATH / "aligned"
 # Create paths if not exist
-for path in [VAR_PATH, CALIBRATED_PATH, ALIGNED_PATH]:
+for path in [VAR_PATH, CALIBRATED_PATH, GRID_VIEW_PATH, ALIGNED_PATH]:
     if not exists(path):
         mkdir(path)
 # Source image files
