@@ -5,14 +5,17 @@ from sys import stderr
 from math import floor, ceil, log
 from numpy import ndarray, squeeze, concatenate, average, ones, float32, absolute
 import numpy as np
+from numpy.typing import NDArray as NPA
 from cv2 import imread, cvtColor, putText, COLOR_BGR2GRAY, LINE_AA, IMREAD_UNCHANGED
 from cv2 import resize as cv_resize
 from cv2 import FONT_HERSHEY_DUPLEX as FONT
+# Project Packages
 import env
-from param import DTYPE, DTYPE_MAX, COLORS
+from param import COLORS
+import util.convert as cvt
 
 
-def loadStack(id: str, base=env.CALIBRATED_PATH) -> np.ndarray:
+def loadStack(id: str, base=env.CALIBRATED_PATH) -> NPA[np.uint16]:
     stack = ["{}_{}.png".format(id, _) for _ in COLORS]
     stack = [rdGray(base / _) for _ in stack]
     return np.stack(stack, axis=2)
@@ -30,12 +33,12 @@ def val_map(x, range) -> float:
 
 
 def invert(rgb):
-    return DTYPE_MAX - ndarray(rgb)
+    return 255 - ndarray(rgb)
 
 
 def wave2bgr(wave, invisible=0.3):
     def gamma(color, GAMMA):
-        return (DTYPE_MAX * pow(color, GAMMA)).astype(DTYPE)
+        return (255 * pow(color, GAMMA)).astype(np.uint8)
     B = val_map(wave, (510, 490))
     G = np.min([val_map(wave, (440, 490)), val_map(wave, (645, 580))])
     R = np.max([val_map(wave, (440, 380)), val_map(wave, (510, 580))])
@@ -50,45 +53,42 @@ def wave2bgr(wave, invisible=0.3):
     return gamma(color * intensity, 0.8)
 
 
-def draw_text(im, txt, pos=None, font=FONT, scale=0.5, color=[DTYPE_MAX] * 3, width=1):
+def draw_text(im, txt, pos=None, font=FONT, scale=0.5, color=[255] * 3, width=1):
     if pos is None:
         pos = (10, im.shape[0] - 10)
-    return putText(im.astype(DTYPE), txt, pos, font, scale, color, width, LINE_AA)
+    return putText(im.astype(np.uint8), txt, pos, font, scale, color, width, LINE_AA)
 
 
-def rdGray(path: Path) -> ndarray:
+def rdGray(path: Path) -> NPA:
     img = imread(str(path), IMREAD_UNCHANGED)
     assert len(img.shape) == 2, img
     return img
 
 
-def contrast(img: ndarray, c: float = 1.0):
+def contrast(img: NPA, c: float = 1.0):
     img = img.astype(float32)
-    img = 2 * img / DTYPE_MAX - 1
+    img = 2 * img / 255 - 1
     mask = img < 0
     img = absolute(img)
     img = img ** (1 / c)
-    img = DTYPE_MAX * (img + 1) / 2
-    img = img.astype(DTYPE)
-    img[mask] = DTYPE_MAX - img[mask]
+    img = 255 * (img + 1) / 2
+    img = img.astype(np.uint8)
+    img[mask] = 255 - img[mask]
     return img
 
 
-def gamma(img: ndarray, g: float = -1.0) -> ndarray:
-    flag_convert = img.dtype == DTYPE
-    if flag_convert: img = img.astype(float32) / DTYPE_MAX
-    if g <= 0.0:
+def gamma(img: NPA, g: float = -1.0):
+    img = cvt.F32(img)
+    if g <= 0:
         mean = average(img)
         g = log(0.5) / log(mean)
     # Run gamma correction
     img = (img ** g)
-    if flag_convert:
-        img = (img * DTYPE_MAX).astype(DTYPE)
-    return img
+    return cvt.F32(img)
 
 
-def gammaAlign(img: ndarray, target: ndarray) -> ndarray:
-    g = log(average(target) / DTYPE_MAX) / log(average(img) / DTYPE_MAX)
+def gammaAlign(img: NPA, target: NPA):
+    g = log(average(cvt.F32(target))) / log(average(cvt.F32(img)))
     return gamma(img, g)
 
 
@@ -107,7 +107,7 @@ def getColorIndex(file_name):
     return result[0]
 
 
-def pad(img: ndarray, color=[DTYPE_MAX] * 3, h: int = 0, w: int = 0) -> ndarray:
+def pad(img: NPA, color=[255] * 3, h: int = 0, w: int = 0) -> NPA[np.uint8]:
     img = img.reshape((img.shape[0], img.shape[1], -1))
     img_h, img_w, img_d = img.shape
     # Fill in default values
@@ -135,7 +135,7 @@ def pad(img: ndarray, color=[DTYPE_MAX] * 3, h: int = 0, w: int = 0) -> ndarray:
     return squeeze(img)
 
 
-def resize(img: ndarray, h: int = 0, w: int = 0) -> ndarray:
+def resize(img: NPA, h: int = 0, w: int = 0) -> ndarray:
     img = img.reshape((img.shape[0], img.shape[1], -1))
     img_h, img_w, img_d = img.shape
     # Validate arguments

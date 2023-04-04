@@ -10,7 +10,7 @@ import numpy as np
 import cv2 as cv
 from tqdm import tqdm
 # User libraries
-from util.info import runtime_info_init
+from util.info import INFO, runtime_info_init
 import util.whiteField as WhiteField
 import util.undistort as Undistort
 import util.refImage as RefImage
@@ -19,6 +19,8 @@ import util.util as util
 import util.saveGrids as saveGrids
 # Path constants
 SAVE_PATH = env.CALIBRATED_PATH
+# Info getter
+getHyperCamInfo = INFO("RawImage.HyperCam")
 
 
 def save_checker_sample(bri_map, mtx, dist, crop):
@@ -46,6 +48,9 @@ def run_calibrate(img_path):
     name = basename(img_path).replace('.png', '')
     # Read and convert raw image
     img = util.rdGray(img_path)
+    # Check for image rotation
+    if getHyperCamInfo("rotation", int) == 180:
+        img = img[::-1, ::-1]
     # white field correction
     bri_corrected = WhiteField.apply(img, name)
     # undistortion
@@ -73,29 +78,29 @@ if __name__ == '__main__':
     # Reload runtime info from template
     runtime_info_init()
     # Remove temporary files in var folder
-    # for f in list(glob(str(env.VAR_PATH / "*"))):
-        # remove(f)
+    for f in list(glob(str(env.VAR_PATH / "*"))):
+        remove(f)
     if exists(env.REPORT_PATH):
         remove(env.REPORT_PATH)
     env.REPORT_PATH.touch()
     # Initialize calibrations
-    # bri_map = WhiteField.init()
-    # mtx, dist, crop = Undistort.init()
+    bri_map = WhiteField.init()
+    mtx, dist, crop = Undistort.init()
     # Check for calibration result
-    # save_checker_sample(bri_map, mtx, dist, crop)
+    save_checker_sample(bri_map, mtx, dist, crop)
     # ------------------------------------------------------------
     with get_context("spawn").Pool(processes=cpu_count() - 1) as pool:
         # Run calibration
         print("\nRunning calibration on raw images ...")
-        # launch(run_calibrate, env.RAW_IMAGES())
+        launch(run_calibrate, env.RAW_IMAGES())
         # Gather ID list
         idList = util.getIdList(env.CALIBRATED_IMAGES())
         # Generate image grids
         print("\nGenerating gird views ...")
-        # launch(get_gridView, idList)
+        launch(get_gridView, idList)
         # Prepare reference images
         print("\nInitializing reference images ...")
-        # launch(RefImage.init, env.REF_IMAGES())
+        launch(RefImage.init, env.REF_IMAGES())
         # Initialize alignment kernel size
         Align.init()
         # Run image alignment

@@ -9,24 +9,29 @@ from numpy.typing import NDArray as NPA
 import cv2 as cv
 import spectral.io.envi as envi
 # User libraries
-from param import DTYPE, DTYPE_MAX
 from util.info import INFO
-from util.convert import REF2BGR, REF2GRAY, scaleToFit, trimToFit
+from util.convert import REF2BGR, REF2GRAY, U8
+from util.util import gamma
 getInfo = INFO("RawImage.Reference")
 
 file = None
+
+
 def load(name) -> NPA[np.float32]:
     global file
     warnings.filterwarnings("ignore")
     path = str(env.REF_PATH / name)
     file = envi.open(path + ".hdr", path + ".dat")
     cube = np.array(file.load())
+    if getInfo("rotation", int) == 180:
+        cube = cube[::-1, ::-1]
     return cube
 
 
 def equalize(cube: NPA[np.float32]) -> NPA[np.float32]:
     kernelSize = getInfo("intensity-equalizer-kernel", int, optional=True)
-    if kernelSize is None: return cube
+    if kernelSize is None:
+        return cube
     assert kernelSize % 2 == 1, "kernel size for equalization must be an ODD integer"
     # Flatten the image into 1 channel
     flat = np.average(cube, axis=2)
@@ -60,6 +65,17 @@ def init(path):
     cv.imwrite(
         str(env.VAR_PATH / f"REF_{name}.png"),
         REF2BGR(cube)
+    )
+    # Generate GrayScale NPY for matching
+    gray = REF2GRAY(cube)
+    gray *= 0.5 / np.average(gray)
+    gray = gamma(gray, 2)
+    gray *= 0.5 / np.average(gray)
+    gray = U8(gray)
+    np.save(env.VAR_PATH / f"REF_{name}_U8C1", gray)
+    cv.imwrite(
+        str(env.VAR_PATH / f"REF_{name}_U8C1.png"),
+        gray
     )
 
 
