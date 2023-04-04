@@ -11,13 +11,12 @@ import util.util as util
 from util.info import INFO, runtime_info, runtime_log
 from util.util import loadStack, rdGray, pad, resize, gamma, gammaAlign
 from util.score import score as getScore
-from util.convert import REF2GRAY, REF2BGR, OUR2BGR, OUR2GRAY, U8, F32
+from util.convert import REF2GRAY, REF2BGR, OUR2BGR, OUR2GRAY, U8, F32, trimToFit
 from param import DTYPE, DTYPE_MAX
 # Path to save results from current module
 SAVE_PATH = env.ALIGNED_PATH
 env.ensureDir(SAVE_PATH / 'raw')
 env.ensureDir(SAVE_PATH / 'ref')
-env.ensureDir(SAVE_PATH / 'kernel')
 # Get template match kernel size
 getInfo = INFO("RawImage.Reference")
 getRuntimeInfo = INFO("Runtime", reload=True)
@@ -45,8 +44,9 @@ def init():
 
 def getKernel(stack: np.ndarray) -> NPA[np.float32]:
     SIZE = getRuntimeInfo("kernel-size", int)
-    result = [stack[:, :, i] for i in range(8)]
-    result = [l * 0.5 / np.average(l) for l in result]
+    result = [F32(stack[:, :, i]) for i in range(8)]
+    result = [l * 0.5 / np.average(l[l < 0.9]) for l in result]
+    result = [trimToFit(l) for l in result]
     result = [gamma(l, 2) for l in result]
     result = [l * 0.5 / np.average(l) for l in result]
     # Remove LED spot and dark image(s)
@@ -56,8 +56,7 @@ def getKernel(stack: np.ndarray) -> NPA[np.float32]:
     return U8(cv.resize(result, (SIZE, SIZE)))
 
 
-def findBestMatch(kernel: NPA[np.float32], name='unknown'):
-    cv.imwrite(str(SAVE_PATH / "kernel" / f"{name}.png"), kernel)
+def findBestMatch(kernel: NPA[np.uint8], name='unknown'):
     # Find best match (highest confidence)
     best_score = 0
     best_pos = (0, 0)
@@ -84,10 +83,9 @@ def findBestMatch(kernel: NPA[np.float32], name='unknown'):
 def apply(id):
     SIZE = getRuntimeInfo("kernel-size", int)
     log = open(env.REPORT_PATH, 'a')
-    stack = loadStack(id)
-    kernel = getKernel(stack)
+    kernel = rdGray(env.ALIGN_KERNEL_PATH / f"{id}.png")
     # Find best match (highest confidence)
-    refID, pos, score = findBestMatch(OUR2GRAY(kernel), id)
+    refID, pos, score = findBestMatch(kernel, id)
     # Global matching finished
     (Y, X) = pos
     ref_cube = loadRef(refID)
@@ -100,6 +98,8 @@ def apply(id):
         f"score = {match_score:.4f} ({score:.4f})",
         file=log
     )
+    # Load stack
+    stack = np.load(env.CALIBRATED_PATH / f"{id}.npy")
     # Save matched data point
     np.save(SAVE_PATH / 'ref' / id, ref_cube_match)
     np.save(SAVE_PATH / 'raw' / id, stack)
@@ -118,8 +118,7 @@ def apply(id):
         [0.25, 0.13, 0.75],
         [0.75, 0.25, 0.13],
         [0.64, 1.00, 0.99],
-    ])
-    print(COLORS)
+    ]).tolist()
     # pair = resize(pair[0], h=H), resize(pair[1], h=H)
     row = [pad(row[i], h=H, w=W, color=COLORS[i]) for i in range(len(row))]
     # Make the margin
@@ -134,8 +133,7 @@ def apply(id):
     row = np.concatenate(row, axis=1)
     H, W, D = row.shape
     row = pad(row, h=H+2*MARGIN, w=W+2*MARGIN, color=(0, 0, 0))
-    # cv.rectangle(ref_bgr, (X, Y),
-    #              (X+SIZE, Y+SIZE), list(COLORS[0]), 3)
+    cv.rectangle(ref_bgr, (X, Y), (X+SIZE, Y+SIZE), list(COLORS[0]), 3)
     ref_bgr = resize(ref_bgr, w=row.shape[1]-2*MARGIN)
     H, W, D = ref_bgr.shape
     ref_bgr = pad(ref_bgr, h=H+2*MARGIN, w=W+2 *

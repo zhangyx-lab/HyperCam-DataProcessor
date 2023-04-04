@@ -7,8 +7,8 @@ from param import DTYPE, DTYPE_MAX
 
 
 def score(src: np.ndarray, dst: np.ndarray) -> float:
-    src = gamma(cv.equalizeHist(U8(src))) >= 200
-    dst = gamma(cv.equalizeHist(U8(dst))) >= 200
+    src = gamma(src) >= 0.5
+    dst = gamma(dst) >= 0.5
     TT = np.logical_and(src, dst)
     R = np.logical_or(TT, src)
     B = np.logical_or(TT, dst)

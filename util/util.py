@@ -16,7 +16,7 @@ import util.convert as cvt
 
 
 def loadStack(id: str, base=env.CALIBRATED_PATH) -> NPA[np.uint16]:
-    stack = ["{}_{}.png".format(id, _) for _ in COLORS]
+    stack = [f"{id}_{color}.png" for color in COLORS]
     stack = [rdGray(base / _) for _ in stack]
     return np.stack(stack, axis=2)
 

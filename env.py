@@ -23,7 +23,8 @@ REPORT_PATH = DATA_PATH / "report.txt"
 CAL_DEMO_PATH = DATA_PATH / "0-CalDemo"
 CALIBRATED_PATH = DATA_PATH / "1-Calibrated"
 GRID_VIEW_PATH = DATA_PATH / "2-GridView"
-ALIGNED_PATH = DATA_PATH / "3-Aligned"
+ALIGN_KERNEL_PATH = DATA_PATH / "3-Kernels"
+ALIGNED_PATH = DATA_PATH / "4-Aligned"
 
 
 def ensureDir(path):
@@ -33,9 +34,9 @@ def ensureDir(path):
 
 
 for d in [
-    VAR_PATH,
-    CAL_DEMO_PATH, CALIBRATED_PATH,
-    GRID_VIEW_PATH, ALIGNED_PATH
+    VAR_PATH, CAL_DEMO_PATH,
+    CALIBRATED_PATH, GRID_VIEW_PATH,
+    ALIGN_KERNEL_PATH, ALIGNED_PATH
 ]:
     ensureDir(d)
 # Source image files

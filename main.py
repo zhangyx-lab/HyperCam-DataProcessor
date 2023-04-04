@@ -39,7 +39,7 @@ def save_checker_sample(bri_map, mtx, dist, crop):
     cv.imwrite(str(env.CAL_DEMO_PATH / '0.raw.png'), img)
     cv.imwrite(str(env.CAL_DEMO_PATH / '1.bri_correct.png'), bri_corrected)
     cv.imwrite(str(env.CAL_DEMO_PATH / '2.cornet_detect.png'), corner)
-    cv.imwrite(str(env.CAL_DEMO_PATH / '4.undistort.png'), undist)
+    cv.imwrite(str(env.CAL_DEMO_PATH / '3.undistort.png'), undist)
     cv.imwrite(str(env.CAL_DEMO_PATH / '4.result.png'), undistorted)
 
 
@@ -48,30 +48,27 @@ def run_calibrate(img_path):
     name = basename(img_path).replace('.png', '')
     # Read and convert raw image
     img = util.rdGray(img_path)
-    # Check for image rotation
-    if getHyperCamInfo("rotation", int) == 180:
-        img = img[::-1, ::-1]
     # white field correction
     bri_corrected = WhiteField.apply(img, name)
     # undistortion
     undistorted = Undistort.apply(bri_corrected)
+    # Check for image rotation
+    if getHyperCamInfo("rotation", int) == 180:
+        undistorted = undistorted[::-1, ::-1]
     # Save image
     cv.imwrite(str(SAVE_PATH / basename(img_path)), undistorted)
 
 
 def get_gridView(id):
-    saveGrids.apply(util.loadStack(id, env.RAW_PATH),
-                    env.GRID_VIEW_PATH / "{}_raw.png".format(id))
-    saveGrids.apply(util.loadStack(id, env.CALIBRATED_PATH),
-                    env.GRID_VIEW_PATH / "{}_cal.png".format(id))
-
-
-
-def launch(fn, tasks):
-    """Run raw image calibration in parallel"""
-    progress = pool.imap_unordered(fn, tasks)
-    results = tqdm(progress, total=len(tasks), ascii=' >=')
-    return [_ for _ in results]
+    stack = util.loadStack(id, env.RAW_PATH)
+    saveGrids.apply(stack, env.GRID_VIEW_PATH / f"{id}_raw.png")
+    stack = util.loadStack(id, env.CALIBRATED_PATH)
+    saveGrids.apply(stack, env.GRID_VIEW_PATH / f"{id}_cal.png")
+    # Save as numpy
+    np.save(env.CALIBRATED_PATH / id, stack)
+    # Save kernel
+    cv.imwrite(str(env.ALIGN_KERNEL_PATH /
+               f"{id}.png"), Align.getKernel(stack))
 
 
 if __name__ == '__main__':
@@ -89,20 +86,25 @@ if __name__ == '__main__':
     # Check for calibration result
     save_checker_sample(bri_map, mtx, dist, crop)
     # ------------------------------------------------------------
-    with get_context("spawn").Pool(processes=cpu_count() - 1) as pool:
+    with get_context("spawn").Pool(processes=10) as pool:
+        def launch(fn, tasks):
+            """Run raw image calibration in parallel"""
+            progress = pool.imap_unordered(fn, tasks)
+            results = tqdm(progress, total=len(tasks), ascii=' >=')
+            return [_ for _ in results]
         # Run calibration
         print("\nRunning calibration on raw images ...")
         launch(run_calibrate, env.RAW_IMAGES())
         # Gather ID list
         idList = util.getIdList(env.CALIBRATED_IMAGES())
+        # Initialize alignment kernel size
+        Align.init()
         # Generate image grids
         print("\nGenerating gird views ...")
         launch(get_gridView, idList)
         # Prepare reference images
         print("\nInitializing reference images ...")
         launch(RefImage.init, env.REF_IMAGES())
-        # Initialize alignment kernel size
-        Align.init()
         # Run image alignment
         print("\nAligning images to references ...")
         launch(Align.apply, idList)
