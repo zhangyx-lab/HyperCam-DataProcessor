@@ -24,7 +24,7 @@ SAVE_PATH = env.CALIBRATED_PATH
 getHyperCamInfo = INFO("RawImage.HyperCam")
 
 
-def save_checker_sample():
+def save_checker_sample(mtx, dist, crop):
     """Show corrected checker"""
     img_path = env.CAL_CHECKER_PATH / Undistort.CENTER_IMG
     img = util.rdGray(img_path)
@@ -41,7 +41,7 @@ def save_checker_sample():
         U8(bri_corrected)
     )
     # undistortion demo
-    corner, undist = Undistort.demoUndistort(bri_corrected)
+    corner, undist = Undistort.demoUndistort(bri_corrected, mtx, dist, crop)
     cv.imwrite(
         str(env.CAL_DEMO_PATH / '2.cornet_detect.png'),
         U8(corner)
@@ -51,7 +51,7 @@ def save_checker_sample():
         U8(undist)
     )
     # undistortion result
-    undistorted = Undistort.apply(bri_corrected)
+    undistorted = Undistort.apply(bri_corrected, mtx, dist, crop)
     # output checkers to data path
     cv.imwrite(
         str(env.CAL_DEMO_PATH / '4.result.png'),
@@ -95,9 +95,9 @@ if __name__ == '__main__':
         r.write("")
     # Initialize calibrations
     WhiteField.init()
-    Undistort.init()
+    mtx, dist, crop = Undistort.init()
     # Check for calibration result
-    save_checker_sample()
+    save_checker_sample(mtx, dist, crop)
     # ------------------------------------------------------------
     with get_context("spawn").Pool(processes=10) as pool:
         def launch(fn, tasks):

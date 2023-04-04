@@ -127,7 +127,7 @@ def init(SHOW_WINDOW=False):
                 cv.setWindowProperty(WINDOW_NAME, cv.WND_PROP_TOPMOST, 1)
                 cv.waitKey(10)
         else:
-            print("  - Warning: No checkerboard found in {path}")
+            print(f"  - Warning: No checkerboard found in {path}")
     # Create 3D point mapping (Object Points)
     # 3d point in real world space
     object_points = getObjPoints(len(corner_points))
