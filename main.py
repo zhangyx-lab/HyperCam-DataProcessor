@@ -10,6 +10,7 @@ import numpy as np
 import cv2 as cv
 from tqdm import tqdm
 # User libraries
+from util.info import runtime_info_init
 import util.whiteField as WhiteField
 import util.undistort as Undistort
 import util.refImage as RefImage
@@ -20,25 +21,29 @@ import util.saveGrids as saveGrids
 SAVE_PATH = env.CALIBRATED_PATH
 
 
-def save_checker_sample(bri_map, mtx, dist):
+def save_checker_sample(bri_map, mtx, dist, crop):
     """Show corrected checker"""
-    img_path = env.CALIB_CHECKER_LIST[0]
+    img_path = env.CAL_CHECKER_LIST[0]
     img = util.rdGray(img_path)
     colorIndex = basename(img_path).replace('.png', '')
     # white field correction
     bri_corrected = WhiteField.apply(img, bri_map[colorIndex])
-    # undistortion
-    undistorted = Undistort.apply(bri_corrected, mtx=mtx, dist=dist)
+    # undistortion demo
+    corner, undist = Undistort.demoUndistort(
+        bri_corrected, mtx=mtx, dist=dist, crop=crop)
+    # undistortion result
+    undistorted = Undistort.apply(bri_corrected, mtx=mtx, dist=dist, crop=crop)
     # output checkers to data path
-    cv.imwrite(str(env.DATA_PATH / 'checker.raw.png'), img)
-    cv.imwrite(str(env.DATA_PATH / 'checker.bri_corrected.png'), bri_corrected)
-    cv.imwrite(str(env.DATA_PATH / 'checker.undistorted.png'), undistorted)
+    cv.imwrite(str(env.CAL_DEMO_PATH / '0.raw.png'), img)
+    cv.imwrite(str(env.CAL_DEMO_PATH / '1.bri_correct.png'), bri_corrected)
+    cv.imwrite(str(env.CAL_DEMO_PATH / '2.cornet_detect.png'), corner)
+    cv.imwrite(str(env.CAL_DEMO_PATH / '4.undistort.png'), undist)
+    cv.imwrite(str(env.CAL_DEMO_PATH / '4.result.png'), undistorted)
 
 
 def run_calibrate(img_path):
     """Run image correction"""
     name = basename(img_path).replace('.png', '')
-
     # Read and convert raw image
     img = util.rdGray(img_path)
     # white field correction
@@ -55,42 +60,44 @@ def get_gridView(id):
     saveGrids.apply(util.loadStack(id, env.CALIBRATED_PATH),
                     env.GRID_VIEW_PATH / "{}_cal.png".format(id))
 
-# Initiate cv2 window
-# WINDOW_NAME = "Processed Image"
-# cv.namedWindow(WINDOW_NAME, cv.WINDOW_AUTOSIZE)
-# cv.startWindowThread()
-# Run raw image calibration in parallel
+
+
 def launch(fn, tasks):
+    """Run raw image calibration in parallel"""
     progress = pool.imap_unordered(fn, tasks)
     results = tqdm(progress, total=len(tasks), ascii=' >=')
     return [_ for _ in results]
 
 
 if __name__ == '__main__':
+    # Reload runtime info from template
+    runtime_info_init()
     # Remove temporary files in var folder
-    for f in list(glob(str(env.VAR_PATH / "*"))):
-        remove(f)
+    # for f in list(glob(str(env.VAR_PATH / "*"))):
+        # remove(f)
     if exists(env.REPORT_PATH):
         remove(env.REPORT_PATH)
     env.REPORT_PATH.touch()
     # Initialize calibrations
-    bri_map = WhiteField.init()
-    mtx, dist = Undistort.init()
+    # bri_map = WhiteField.init()
+    # mtx, dist, crop = Undistort.init()
     # Check for calibration result
-    save_checker_sample(bri_map, mtx, dist)
-    # ----------------------
-    with get_context("spawn").Pool(processes=cpu_count()) as pool:
+    # save_checker_sample(bri_map, mtx, dist, crop)
+    # ------------------------------------------------------------
+    with get_context("spawn").Pool(processes=cpu_count() - 1) as pool:
         # Run calibration
         print("\nRunning calibration on raw images ...")
-        launch(run_calibrate, env.RAW_IMAGES())
+        # launch(run_calibrate, env.RAW_IMAGES())
         # Gather ID list
         idList = util.getIdList(env.CALIBRATED_IMAGES())
         # Generate image grids
         print("\nGenerating gird views ...")
-        launch(get_gridView, idList)
+        # launch(get_gridView, idList)
         # Prepare reference images
         print("\nInitializing reference images ...")
-        launch(RefImage.init, env.REF_IMAGES())
+        # launch(RefImage.init, env.REF_IMAGES())
+        # Initialize alignment kernel size
+        Align.init()
         # Run image alignment
         print("\nAligning images to references ...")
         launch(Align.apply, idList)

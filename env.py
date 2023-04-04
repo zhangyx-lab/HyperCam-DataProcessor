@@ -1,38 +1,49 @@
 from pathlib import Path
-from glob import glob
-from os import mkdir
+from glob import glob as glob
+from os import mkdir, environ
 from os.path import exists, dirname, realpath
-# Size of the template matching kernel
-KERNEL_SIZE = 286
-# Color profiles for our camera
-COLORS = [
-    "Ultra_Violet",	# 0
-    "Blue",			# 1
-    "Green",		# 2
-    "Yellow_Green",	# 3
-    "Yellow",		# 4
-    "Orange",		# 5
-    "Red",			# 6
-    "Infrared"		# 7
-]
+# Debug level
+if environ.get('DEBUG') is None:
+    DEBUG = 0
+else:
+    DEBUG = int(environ.get('DEBUG') or 1)
+    print(f"DEBUG LEVEL {DEBUG}")
 # Base path of the project
 BASE = Path(dirname(realpath(__file__)))
 # Path constants
 VAR_PATH = BASE / "var"
 DATA_PATH = BASE / "data"
-RAW_PATH = DATA_PATH / "raw"
-REF_PATH = DATA_PATH / "reference"
+# Required data sources
+RAW_PATH = DATA_PATH / "RAW"
+REF_PATH = DATA_PATH / "REF"
+CAL_CHECKER_PATH = DATA_PATH / "CAL_CHECKER"
+CAL_WHITE_PATH = DATA_PATH / "CAL_WHITE"
+# Generated file destinations
 REPORT_PATH = DATA_PATH / "report.txt"
-CALIBRATED_PATH = DATA_PATH / "calibrated"
-GRID_VIEW_PATH = DATA_PATH / "gridView"
-ALIGNED_PATH = DATA_PATH / "aligned"
-# Create paths if not exist
-for path in [VAR_PATH, CALIBRATED_PATH, GRID_VIEW_PATH, ALIGNED_PATH]:
+CAL_DEMO_PATH = DATA_PATH / "0-CalDemo"
+CALIBRATED_PATH = DATA_PATH / "1-Calibrated"
+GRID_VIEW_PATH = DATA_PATH / "2-GridView"
+ALIGNED_PATH = DATA_PATH / "3-Aligned"
+
+
+def ensureDir(path):
+    """Create path if not exist"""
     if not exists(path):
         mkdir(path)
+
+
+for d in [
+    VAR_PATH,
+    CAL_DEMO_PATH, CALIBRATED_PATH,
+    GRID_VIEW_PATH, ALIGNED_PATH
+]:
+    ensureDir(d)
 # Source image files
-CALIB_CHECKER_LIST = list(glob(str(BASE / "calib_checker" / "*.png")))
-CALIB_WHITE_LIST = list(glob(str(BASE / "calib_white" / "*.png")))
-RAW_IMAGES = lambda: list(glob(str(RAW_PATH / "*.png")))
-REF_IMAGES = lambda: [_.replace(".dat", "") for _ in glob(str(REF_PATH / "*.dat"))]
-CALIBRATED_IMAGES = lambda: list(glob(str(CALIBRATED_PATH / "*.png")))
+CAL_CHECKER_LIST = list(glob(str(CAL_CHECKER_PATH / "*.png")))
+CAL_WHITE_LIST = list(glob(str(CAL_WHITE_PATH / "*.png")))
+def RAW_IMAGES(): return list(glob(str(RAW_PATH / "*.png")))
+def REF_IMAGES(): return [_.replace(".dat", "")
+                          for _ in glob(str(REF_PATH / "*.dat"))]
+
+
+def CALIBRATED_IMAGES(): return list(glob(str(CALIBRATED_PATH / "*.png")))

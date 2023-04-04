@@ -3,6 +3,8 @@ import cv2 as cv
 import numpy as np
 from param import LED_LIST
 from util.util import pad, draw_text, wave2bgr
+# User libraries
+from param import DTYPE, DTYPE_MAX
 
 def apply(stack, path):
     MARGIN = 128
@@ -15,7 +17,7 @@ def apply(stack, path):
         layer = np.stack([stack[i] for _ in range(3)],
                          axis=2).astype(np.float64)
         layer = (layer / np.max(layer)) * color
-        layer = pad(layer, h=H+2*MARGIN, w=W+MARGIN).astype(np.uint8)[MARGIN:]
+        layer = pad(layer, h=H+2*MARGIN, w=W+MARGIN).astype(DTYPE)[MARGIN:]
         t_color = color.astype(np.float64)
         t_color = np.minimum(t_color, 100 * t_color / np.average(t_color))
         B, G, R = [int(_) for _ in t_color]
