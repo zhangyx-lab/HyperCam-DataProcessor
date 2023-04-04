@@ -11,36 +11,52 @@ import cv2 as cv
 from tqdm import tqdm
 # User libraries
 from util.info import INFO, runtime_info_init
+from util.convert import U16, U8
 import util.whiteField as WhiteField
 import util.undistort as Undistort
 import util.refImage as RefImage
 import util.align as Align
 import util.util as util
-import util.saveGrids as saveGrids
+import util.saveGrids as SaveGrids
 # Path constants
 SAVE_PATH = env.CALIBRATED_PATH
 # Info getter
 getHyperCamInfo = INFO("RawImage.HyperCam")
 
 
-def save_checker_sample(bri_map, mtx, dist, crop):
+def save_checker_sample():
     """Show corrected checker"""
-    img_path = env.CAL_CHECKER_LIST[0]
+    img_path = env.CAL_CHECKER_PATH / Undistort.CENTER_IMG
     img = util.rdGray(img_path)
-    colorIndex = basename(img_path).replace('.png', '')
+    cv.imwrite(
+        str(env.CAL_DEMO_PATH / '0.raw.png'),
+        U8(img)
+    )
+    # Load color index from configuration
+    colorIndex = Undistort.CENTER_IMG_LED
     # white field correction
-    bri_corrected = WhiteField.apply(img, bri_map[colorIndex])
+    bri_corrected = WhiteField.apply(img, colorIndex)
+    cv.imwrite(
+        str(env.CAL_DEMO_PATH / '1.bri_correct.png'),
+        U8(bri_corrected)
+    )
     # undistortion demo
-    corner, undist = Undistort.demoUndistort(
-        bri_corrected, mtx=mtx, dist=dist, crop=crop)
+    corner, undist = Undistort.demoUndistort(bri_corrected)
+    cv.imwrite(
+        str(env.CAL_DEMO_PATH / '2.cornet_detect.png'),
+        U8(corner)
+    )
+    cv.imwrite(
+        str(env.CAL_DEMO_PATH / '3.undistort.png'),
+        U8(undist)
+    )
     # undistortion result
-    undistorted = Undistort.apply(bri_corrected, mtx=mtx, dist=dist, crop=crop)
+    undistorted = Undistort.apply(bri_corrected)
     # output checkers to data path
-    cv.imwrite(str(env.CAL_DEMO_PATH / '0.raw.png'), img)
-    cv.imwrite(str(env.CAL_DEMO_PATH / '1.bri_correct.png'), bri_corrected)
-    cv.imwrite(str(env.CAL_DEMO_PATH / '2.cornet_detect.png'), corner)
-    cv.imwrite(str(env.CAL_DEMO_PATH / '3.undistort.png'), undist)
-    cv.imwrite(str(env.CAL_DEMO_PATH / '4.result.png'), undistorted)
+    cv.imwrite(
+        str(env.CAL_DEMO_PATH / '4.result.png'),
+        U8(undistorted)
+    )
 
 
 def run_calibrate(img_path):
@@ -56,14 +72,14 @@ def run_calibrate(img_path):
     if getHyperCamInfo("rotation", int) == 180:
         undistorted = undistorted[::-1, ::-1]
     # Save image
-    cv.imwrite(str(SAVE_PATH / basename(img_path)), undistorted)
+    cv.imwrite(str(SAVE_PATH / basename(img_path)), U16(undistorted))
 
 
 def get_gridView(id):
     stack = util.loadStack(id, env.RAW_PATH)
-    saveGrids.apply(stack, env.GRID_VIEW_PATH / f"{id}_raw.png")
+    SaveGrids.apply(stack, f"{id}_Raw.png")
     stack = util.loadStack(id, env.CALIBRATED_PATH)
-    saveGrids.apply(stack, env.GRID_VIEW_PATH / f"{id}_cal.png")
+    SaveGrids.apply(stack, f"{id}_Cal.png")
     # Save as numpy
     np.save(env.CALIBRATED_PATH / id, stack)
     # Save kernel
@@ -75,16 +91,13 @@ if __name__ == '__main__':
     # Reload runtime info from template
     runtime_info_init()
     # Remove temporary files in var folder
-    for f in list(glob(str(env.VAR_PATH / "*"))):
-        remove(f)
-    if exists(env.REPORT_PATH):
-        remove(env.REPORT_PATH)
-    env.REPORT_PATH.touch()
+    with open(env.REPORT_PATH, 'w') as r:
+        r.write("")
     # Initialize calibrations
-    bri_map = WhiteField.init()
-    mtx, dist, crop = Undistort.init()
+    WhiteField.init()
+    Undistort.init()
     # Check for calibration result
-    save_checker_sample(bri_map, mtx, dist, crop)
+    save_checker_sample()
     # ------------------------------------------------------------
     with get_context("spawn").Pool(processes=10) as pool:
         def launch(fn, tasks):

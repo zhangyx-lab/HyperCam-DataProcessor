@@ -33,12 +33,19 @@ def val_map(x, range) -> float:
 
 
 def invert(rgb):
-    return 255 - ndarray(rgb)
+    if not isinstance(rgb, np.ndarray):
+        rgb = np.ndarray(rgb)
+    match rgb.dtype:
+        case np.uint8: return 255 - rgb
+        case np.uint16: return 65538 - rgb
+        case t:
+            assert isinstance(rgb, np.floating), t
+            return 1 - cvt.trimToFit(rgb)
 
 
 def wave2bgr(wave, invisible=0.3):
     def gamma(color, GAMMA):
-        return (255 * pow(color, GAMMA)).astype(np.uint8)
+        return pow(color, GAMMA)
     B = val_map(wave, (510, 490))
     G = np.min([val_map(wave, (440, 490)), val_map(wave, (645, 580))])
     R = np.max([val_map(wave, (440, 380)), val_map(wave, (510, 580))])
@@ -50,13 +57,14 @@ def wave2bgr(wave, invisible=0.3):
         invisible
     ])
     color = np.array([B, G, R], dtype=float32)
-    return gamma(color * intensity, 0.8)
+    return cvt.F32(gamma(color * intensity, 0.8))
 
 
 def draw_text(im, txt, pos=None, font=FONT, scale=0.5, color=[255] * 3, width=1):
     if pos is None:
         pos = (10, im.shape[0] - 10)
-    return putText(im.astype(np.uint8), txt, pos, font, scale, color, width, LINE_AA)
+    color = list(map(int, color))
+    return putText(cvt.U8(im).copy(), txt, pos, font, scale, color, width, LINE_AA)
 
 
 def rdGray(path: Path) -> NPA:
@@ -100,26 +108,31 @@ def getIdList(path_list):
 
 def getColorIndex(file_name):
     result = re.findall("(?<=_)\w+$", file_name)
-    if len(result) == 0:
-        print("Error: unable to extract color info from file name '{}'".format(
-            file_name), file=stderr)
-        raise RuntimeError
-    return result[0]
+    if len(result) > 0:
+        return result[0]
+    else:
+        return file_name
 
 
-def pad(img: NPA, color=[255] * 3, h: int = 0, w: int = 0) -> NPA[np.uint8]:
+def pad(img: NPA, color=None, h: int = 0, w: int = 0) -> NPA[np.uint8]:
     img = img.reshape((img.shape[0], img.shape[1], -1))
     img_h, img_w, img_d = img.shape
+    t = img.dtype
+    # Caculate default color (white)
+    if color is None:
+        if issubclass(t.type, np.floating):
+            color = np.ones((img_d,), dtype=t)
+        else:
+            assert issubclass(t.type, np.unsignedinteger), t
+            color = ~np.zeros((img_d,), dtype=t)
     # Fill in default values
     if h <= 0:
         h = img_h
     if w <= 0:
         w = img_w
     # Check if target size is larger than or equal to image size
-    if img_h > h or img_w > w:
-        print("Image ({} by {}) too large to fit into {} by {}".format(
-            img_w, img_h, w, h), file=stderr)
-        raise RuntimeError
+    assert img_h <= h, f"Image height ({img_h}px) too large to pad to {h}px"
+    assert img_w <= w, f"Image width ({img_w}px) too large to pad to {w}px"
 
     def gen(shape):
         """Padding generator"""
@@ -144,7 +157,6 @@ def resize(img: NPA, h: int = 0, w: int = 0) -> ndarray:
     elif w <= 0 and h > 0:
         w = round(h * img_w / img_h)
     else:
-        print("Invalid target size: {} by {}".format(w, h), file=stderr)
-        raise RuntimeError
+        assert False, f"Invalid target size: {w} by {h}"
     # Do resize
     return squeeze(cv_resize(img, (w, h)))

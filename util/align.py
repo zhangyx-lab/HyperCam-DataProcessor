@@ -12,7 +12,8 @@ from util.info import INFO, runtime_info, runtime_log
 from util.util import loadStack, rdGray, pad, resize, gamma, gammaAlign
 from util.score import score as getScore
 from util.convert import REF2GRAY, REF2BGR, OUR2BGR, OUR2GRAY, U8, F32, trimToFit
-from param import DTYPE, DTYPE_MAX
+from util.refImage import U8C1_PATH
+from util.transform import equalizeGeo
 # Path to save results from current module
 SAVE_PATH = env.ALIGNED_PATH
 env.ensureDir(SAVE_PATH / 'raw')
@@ -23,7 +24,7 @@ getRuntimeInfo = INFO("Runtime", reload=True)
 
 
 def loadRef(refID: str) -> NPA[np.float32]:
-    ref = np.load(env.VAR_PATH / f"REF_{refID}.npy")
+    ref = np.load(env.REF_CAL_PATH / f"{refID}.npy")
     assert ref.dtype == np.float32
     return ref
 
@@ -42,16 +43,19 @@ def init():
     runtime_info("kernel-size", kernel_size)
 
 
-def getKernel(stack: np.ndarray) -> NPA[np.float32]:
+def getKernel(stack: np.ndarray, level: float = 0.5, g: float = 2, ks = 320):
     SIZE = getRuntimeInfo("kernel-size", int)
-    result = [F32(stack[:, :, i]) for i in range(8)]
-    result = [l * 0.5 / np.average(l[l < 0.9]) for l in result]
-    result = [trimToFit(l) for l in result]
-    result = [gamma(l, 2) for l in result]
-    result = [l * 0.5 / np.average(l) for l in result]
+    # Equalize histogram
+    result = [F32(stack[:, :, i]) for i in range(2, 8)]
+    result = [l * level / np.average(l[l < 0.9]) for l in result]
+    result = [gamma(l, g) for l in result]
+    result = [l * level / np.average(l) for l in result]
     # Remove LED spot and dark image(s)
     result = np.stack(result, axis=2)
     result = np.min(result, axis=2)
+    # Equalize geometrical intensity distribution
+    if ks:
+        result = equalizeGeo(result, ks * 2 + 1)
     # stack = np.average(np.sort(stack, axis=2)[:, :, 2:4], axis=2)
     return U8(cv.resize(result, (SIZE, SIZE)))
 
@@ -65,7 +69,7 @@ def findBestMatch(kernel: NPA[np.uint8], name='unknown'):
         refID = basename(refFile)
         # ref = loadRef(refID)
         # ref = REF2GRAY(ref)
-        ref = np.load(env.VAR_PATH / f"REF_{refID}_U8C1.npy")
+        ref = np.load(U8C1_PATH / f"{refID}.npy")
         # Run template matching
         match = cv.matchTemplate(ref, kernel, cv.TM_CCOEFF_NORMED)
         H, W = match.shape
@@ -144,6 +148,43 @@ def apply(id):
 
 
 if __name__ == '__main__':
-    for id in util.getIdList(env.CALIBRATED_IMAGES()):
-        print(f"Matching {id}")
-        apply(id)
+    idList = util.getIdList(env.CALIBRATED_IMAGES())
+    # for id in idList:
+    #     print(f"Matching {id}")
+    #     apply(id)
+    i = 0
+    stack = loadStack(idList[i])
+    names  = ["level", "gamma", "kernel"]
+    params = [    500,     100,        0]
+    limits = [   5000,     500,      999]
+    scales = [   1000,     100,        0]
+
+    def show():
+        args = [a / b if b else a for a, b in zip(params, scales)]
+        kernel = getKernel(stack, *args)
+        cv.imshow("kernel", U8(kernel))
+
+    def updater(index):
+        def update(val):
+            params[index] = val
+            show()
+        return update
+
+    cv.namedWindow("kernel")
+    for i, n, p, l in zip(range(len(names)), names, params, limits):
+        cv.createTrackbar(n, "kernel", p, l, updater(i))
+    cv.startWindowThread()
+
+    while True:
+        show()
+        k = cv.waitKey(0)
+        if k == ord('['):
+            if i > 0:
+                i -= 1
+                stack = loadStack(idList[i])
+        elif k == ord(']'):
+            if i + 1 < len(idList):
+                i += 1
+                stack = loadStack(idList[i])
+        else:
+            break

@@ -57,13 +57,22 @@ Developed and maintained by *[Yuxuan Zhang](mailto:zhangyuxuan@ufl.edu)*
     │   ├── XX.hdr
     │   └── ...
     │
+    ├── 0-CalDemo
+    │   └── [Runtime generated images]
+    │
     ├── 1-Calibrated
     │   └── [Runtime generated images]
     │
-    ├── 2-Aligned
+    ├── 2-GridView
     │   └── [Runtime generated images]
     │
-    ├── 3-GridView
+    ├── 3-Kernels
+    │   └── [Runtime generated images]
+    │
+    ├── 4-CalibratedRefs
+    │   └── [Runtime generated images]
+    │
+    ├── 5-Aligned
     │   └── [Runtime generated images]
     │
     └── report.txt

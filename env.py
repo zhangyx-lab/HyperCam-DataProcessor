@@ -1,3 +1,4 @@
+#!python3
 from pathlib import Path
 from glob import glob as glob
 from os import mkdir, environ
@@ -11,34 +12,42 @@ else:
 # Base path of the project
 BASE = Path(dirname(realpath(__file__)))
 # Path constants
-VAR_PATH = BASE / "var"
-DATA_PATH = BASE / "data"
+DATA_PATH        = BASE / "data"
+# List of all dynamically written directorys
+dynamic_paths    = []
+
+
+def DATA_DIR(subdir: str, variable: bool = False):
+    path = DATA_PATH / subdir
+    if not exists(path):
+        assert variable, f"Missing required data directory {path}"
+        mkdir(path)
+    if variable:
+        dynamic_paths.append(path)
+    return path
 # Required data sources
-RAW_PATH = DATA_PATH / "RAW"
-REF_PATH = DATA_PATH / "REF"
-CAL_CHECKER_PATH = DATA_PATH / "CAL_CHECKER"
-CAL_WHITE_PATH = DATA_PATH / "CAL_WHITE"
+RAW_PATH          = DATA_DIR("RAW")
+REF_PATH          = DATA_DIR("REF")
+CAL_CHECKER_PATH  = DATA_DIR("CAL_CHECKER")
+CAL_WHITE_PATH    = DATA_DIR("CAL_WHITE")
+# File that contains alignment reports
+REPORT_PATH       = DATA_PATH / "report.txt"
 # Generated file destinations
-REPORT_PATH = DATA_PATH / "report.txt"
-CAL_DEMO_PATH = DATA_PATH / "0-CalDemo"
-CALIBRATED_PATH = DATA_PATH / "1-Calibrated"
-GRID_VIEW_PATH = DATA_PATH / "2-GridView"
-ALIGN_KERNEL_PATH = DATA_PATH / "3-Kernels"
-ALIGNED_PATH = DATA_PATH / "4-Aligned"
+CAL_DEMO_PATH     = DATA_DIR("0-CalDemo"       , True)
+CALIBRATED_PATH   = DATA_DIR("1-Calibrated"    , True)
+GRID_VIEW_PATH    = DATA_DIR("2-GridView"      , True)
+ALIGN_KERNEL_PATH = DATA_DIR("3-Kernels"       , True)
+REF_CAL_PATH      = DATA_DIR("4-CalibratedRefs", True)
+ALIGNED_PATH      = DATA_DIR("5-Aligned"       , True)
 
 
 def ensureDir(path):
     """Create path if not exist"""
     if not exists(path):
         mkdir(path)
+    return path
 
 
-for d in [
-    VAR_PATH, CAL_DEMO_PATH,
-    CALIBRATED_PATH, GRID_VIEW_PATH,
-    ALIGN_KERNEL_PATH, ALIGNED_PATH
-]:
-    ensureDir(d)
 # Source image files
 CAL_CHECKER_LIST = list(glob(str(CAL_CHECKER_PATH / "*.png")))
 CAL_WHITE_LIST = list(glob(str(CAL_WHITE_PATH / "*.png")))
@@ -48,3 +57,8 @@ def REF_IMAGES(): return [_.replace(".dat", "")
 
 
 def CALIBRATED_IMAGES(): return list(glob(str(CALIBRATED_PATH / "*.png")))
+
+
+if __name__ == '__main__':
+    for path in dynamic_paths:
+        print(path)

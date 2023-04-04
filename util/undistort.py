@@ -10,18 +10,20 @@ import matplotlib.pyplot as plt
 import env
 from util.info import INFO, runtime_info, runtime_log
 from util.util import rdGray
+from util.convert import U8
 from param import DTYPE, DTYPE_MAX
 # global variable
-CAM_MTX_PATH = env.VAR_PATH / "CAM_MTX.npy"
+CAM_MTX_PATH = env.CAL_CHECKER_PATH / "CAM_MTX.npy"
 mtx = np.load(CAM_MTX_PATH) if exists(CAM_MTX_PATH) else None
-CAM_DIST_PATH = env.VAR_PATH / "CAM_DIST.npy"
+CAM_DIST_PATH = env.CAL_CHECKER_PATH / "CAM_DIST.npy"
 dist = np.load(CAM_DIST_PATH) if exists(CAM_DIST_PATH) else None
-CAM_CROP_PATH = env.VAR_PATH / "CAM_CROP.npy"
+CAM_CROP_PATH = env.CAL_CHECKER_PATH / "CAM_CROP.npy"
 crop = np.load(CAM_CROP_PATH) if exists(CAM_CROP_PATH) else None
 # Parse from info.ini
 INFO = INFO("Calibration.Checkerboard")
 GRID = list(map(int, INFO("grid-count").split(",")))
 CENTER_IMG = INFO("centered-grid")
+CENTER_IMG_LED = INFO("centered-grid-led")
 GRID_SIZE = INFO("size-per-grid", eval)
 # Subpixel alignment termination criteria
 CRITERIA = (cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -33,7 +35,7 @@ def getCorners(img, grid=GRID, criteria=CRITERIA):
     if img.dtype == np.uint16:
         img = (img >> 8).astype(np.uint8)
     # Convert data type
-    # img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+    img = U8(img)
     # Match corners
     ret, corners = cv.findChessboardCorners(img, grid, None)
     if ret != True:
@@ -52,6 +54,50 @@ def getObjPoints(count: int, grid=GRID):
     obj = np.zeros((m * n, 3), np.float32)
     obj[:, :2] = np.mgrid[:m, :n].T.reshape(-1, 2)
     return np.array([obj] * count)
+
+
+def findCropBoundaries(mtx, dist):
+    # Load image with the checkerbord in the center
+    img = rdGray(env.CAL_CHECKER_PATH / CENTER_IMG)
+    H, W = img.shape
+    # Calculate undistorted points' coordinates
+    d_points = getCorners(img)
+    assert d_points is not None, f"Unable to find checkerboard in {CENTER_IMG}"
+    u_points = cv.undistortPoints(d_points, mtx, dist, None, mtx)
+    u_points = np.array(u_points).squeeze()
+    # Get float coordinates of the cropping area
+    crop = np.array([
+        np.min(u_points, axis=0),
+        np.max(u_points, axis=0)
+    ])
+    crop = np.maximum(crop, np.zeros(crop.shape))
+    crop = np.minimum(crop, [[W, H]] * 2)
+    # Crop parameters
+    center = np.rint(np.average(crop, axis=0))
+    limit = np.array([W, H])
+    halfSize = np.rint(np.min(crop[1] - crop[0]) / 2)
+    # Caculate Optimal New Size
+    delta = int(np.min([halfSize, *center, *(limit - center)]))
+    runtime_log(
+        f"Cropping area is computed using:",
+        f"  image with checker in cencter -> data/CAL_CHECKER/{CENTER_IMG}",
+        f"  top right checker corner      -> {crop[1]}",
+        f"  lower left checker corner     -> {crop[0]}",
+    )
+    runtime_info("cropping-area-size", 2 * delta)
+    # Update cropping area coordinates
+    crop = np.array([center - delta, center + delta], dtype=np.uint).T
+    # Caculate pixel density according to delta-pixels
+    actual_size = np.min(GRID) * GRID_SIZE  # mm
+    pixel_density = delta / actual_size
+    runtime_log(
+        f"Pixel density is computed using:",
+        f"  cropping area's actual size -> {actual_size:.4f} mm",
+        f"  cropping area's pixel size  -> {delta} px",
+    )
+    runtime_info("pixel-density-our-camera", pixel_density)
+    # Return the result
+    return crop
 
 
 def init(SHOW_WINDOW=False):
@@ -89,43 +135,8 @@ def init(SHOW_WINDOW=False):
     ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(
         object_points, corner_points, img.shape[::-1], None, None
     )
-    # Calculate undistorted points' coordinates
-    img = rdGray(env.CAL_CHECKER_PATH / CENTER_IMG)
-    d_points = getCorners(img)
-    assert d_points is not None, "Unable to find checkerboard in center-grid image"
-    u_points = cv.undistortPoints(d_points, mtx, dist, None, mtx)
-    u_points = np.array(u_points).squeeze()
-    # Get float coordinates of the cropping area
-    crop = np.array([
-        np.min(u_points, axis=0),
-        np.max(u_points, axis=0)
-    ])
-    crop = np.maximum(crop, np.zeros(crop.shape))
-    crop = np.minimum(crop, [[W, H]] * 2)
-    # Crop parameters
-    center = np.rint(np.average(crop, axis=0))
-    limit = np.array([W, H])
-    halfSize = np.rint(np.min(crop[1] - crop[0]) / 2)
-    # Caculate Optimal New Size
-    delta = int(np.min([halfSize, *center, *(limit - center)]))
-    runtime_log(
-        f"Cropping area is computed using:",
-        f"  image with checker in cencter -> data/CAL_CHECKER/{CENTER_IMG}",
-        f"  top right checker corner      -> {crop[1]}",
-        f"  lower left checker corner     -> {crop[0]}",
-    )
-    runtime_info("cropping-area-size", 2 * delta)
-    # Update cropping area coordinates
-    crop = np.array([center - delta, center + delta], dtype=np.uint).T
-    # Caculate pixel density according to delta-pixels
-    actual_size = np.min(GRID) * GRID_SIZE # mm
-    pixel_density = delta / actual_size
-    runtime_log(
-        f"Pixel density is computed using:",
-        f"  cropping area's actual size -> {actual_size:.4f} mm",
-        f"  cropping area's pixel size  -> {delta} px",
-    )
-    runtime_info("pixel-density-our-camera", pixel_density)
+    # Find cropping area
+    crop = findCropBoundaries(mtx, dist)
     # Save parameters
     np.save(CAM_MTX_PATH, mtx)
     np.save(CAM_DIST_PATH, dist)
@@ -133,10 +144,9 @@ def init(SHOW_WINDOW=False):
     return mtx, dist, crop
 
 
-def demoUndistort(img, mtx, dist, crop):
+def demoUndistort(img, mtx=mtx, dist=dist, crop=crop):
     # Convert to uint8
-    if img.dtype != np.uint8:
-        img = (255 * img.astype(np.float64) / DTYPE_MAX).astype(np.uint8)
+    img = U8(img)
     # Convert to RGB
     if len(img.shape) < 3:
         img = np.stack([img[:, :]] * 3, axis=2)

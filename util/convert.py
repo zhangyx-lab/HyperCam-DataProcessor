@@ -3,6 +3,7 @@ from numpy.typing import NDArray as NPA
 from param import DTYPE, DTYPE_MAX, REF_BANDS, LED_LIST
 import util.util as util
 
+
 def gaussian(x, u, sigma): return np.exp(-np.square((u - x) / (sigma ** 2)))
 
 
@@ -40,7 +41,7 @@ def U8(img: NPA, overflow=trimToFit) -> NPA[np.uint8]:
         case np.uint8: return img
         case np.uint16: return (img >> 8).astype(np.uint8)
         case t:
-            assert t == np.float16 or t == np.float32 or t == np.float64, t
+            assert issubclass(t.type, np.floating), t
             img = np.rint(checkOverFlow(img, handler=overflow) * 255)
             return img.astype(np.uint8)
 
@@ -52,7 +53,7 @@ def U16(img: NPA, overflow=trimToFit) -> NPA[np.uint16]:
         case np.uint8: return (img << 8).astype(np.uint16)
         case np.uint16: img
         case t:
-            assert t == np.float16 or t == np.float32 or t == np.float64, t
+            assert issubclass(t.type, np.floating), t
             img = np.rint(checkOverFlow(img, handler=overflow) * 65535)
             return img.astype(np.uint16)
 

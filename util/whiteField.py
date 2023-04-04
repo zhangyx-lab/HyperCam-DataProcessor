@@ -8,8 +8,7 @@ from os.path import basename
 # User package
 from param import DTYPE, DTYPE_MAX
 import util.util as util
-# global variable
-bri_map = {}
+from util.convert import U16, F32
 
 
 def init():
@@ -18,20 +17,18 @@ def init():
     # Prepare brightness map
     for img_path in env.CAL_WHITE_LIST:
         colorIndex = basename(img_path).replace(".png", "")
-        ref = util.rdGray(img_path)
-        map = (np.ones(ref.shape) * DTYPE_MAX).astype(np.float32) / ref
-        bri_map[colorIndex] = map
-        np.save(env.VAR_PATH / ("BRI_MAP_" + colorIndex + ".npy"), map)
-    return bri_map
+        ref = F32(util.rdGray(img_path))
+        ref = np.maximum(ref, 1e-4)
+        map = 1 / ref
+        np.save(env.CAL_WHITE_PATH / colorIndex, F32(map))
 
 
 def load_map(colorIndex):
-    return np.load(env.VAR_PATH / ("BRI_MAP_" + colorIndex + ".npy"))
+    return np.load(env.CAL_WHITE_PATH / f"{colorIndex}.npy")
 
 
-def apply(img, map):
-    if (isinstance(map, str)):
-        map = load_map(util.getColorIndex(map))
-    result = map * img
-    result[result > DTYPE_MAX] = DTYPE_MAX
-    return result.astype(DTYPE)
+def apply(img, white):
+    if (isinstance(white, str)):
+        white = load_map(util.getColorIndex(white))
+    result = white * F32(img)
+    return result
