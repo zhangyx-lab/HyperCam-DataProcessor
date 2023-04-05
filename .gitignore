@@ -7,5 +7,11 @@ __pycache__
 # Data contents
 var
 data
+DataSet
 # Notebooks for testing
 *.ipynb
+# Zip and tgz archives
+*.zip
+*.tar
+*.tgz
+*.gz
