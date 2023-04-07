@@ -9,9 +9,10 @@ BGR = [466, 520, 600]
 
 
 def post_process_bgr(cube: NDArray, callback):
-    bgr = np.stack([
-        callback(cube, b, 3) for b in BGR
-    ], axis=2)
+    bgr = [callback(cube, b, 3) for b in BGR]
+    gamma = cvtb.histogram.gamma(None, np.stack(bgr, axis=2))
+    bgr = [gamma(l) for l in bgr]
+    bgr = np.stack(bgr, axis=2)
     bgr = cvtb.types.scaleToFitDR(bgr, [0.01, 0.99])
     return bgr
     # FROM REF
