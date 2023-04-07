@@ -8,7 +8,7 @@ import util.util as util
 BGR = [466, 520, 600]
 
 
-def post_process_bgr(bgr: NDArray, callback):
+def post_process_bgr(cube: NDArray, callback):
     bgr = np.stack([
         callback(cube, b, 3) for b in BGR
     ], axis=2)
