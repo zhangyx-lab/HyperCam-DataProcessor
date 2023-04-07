@@ -6,18 +6,18 @@ from os.path import basename, exists
 from glob import glob
 from multiprocessing import get_context, cpu_count
 # PIP Packages
+import cvtb
 import numpy as np
 import cv2 as cv
 from tqdm import tqdm
 # User libraries
 from util.info import INFO, runtime_info_init
-from util.convert import U16, U8
-import util.whiteField as WhiteField
-import util.undistort as Undistort
-import util.refImage as RefImage
-import util.align as Align
+import pipeline.WhiteField as WhiteField
+import pipeline.Undistort as Undistort
+import pipeline.RefImage as RefImage
+import pipeline.Align as Align
 import util.util as util
-import util.saveGrids as SaveGrids
+import pipeline.SaveGrids as SaveGrids
 # Path constants
 SAVE_PATH = env.CALIBRATED_PATH
 # Info getter
@@ -30,7 +30,7 @@ def save_checker_sample(mtx, dist, crop):
     img = util.rdGray(img_path)
     cv.imwrite(
         str(env.CAL_DEMO_PATH / '0.raw.png'),
-        U8(img)
+        cvtb.types.U8(img)
     )
     # Load color index from configuration
     colorIndex = Undistort.CENTER_IMG_LED
@@ -38,24 +38,24 @@ def save_checker_sample(mtx, dist, crop):
     bri_corrected = WhiteField.apply(img, colorIndex)
     cv.imwrite(
         str(env.CAL_DEMO_PATH / '1.bri_correct.png'),
-        U8(bri_corrected)
+        cvtb.types.U8(bri_corrected)
     )
     # undistortion demo
     corner, undist = Undistort.demoUndistort(bri_corrected, mtx, dist, crop)
     cv.imwrite(
         str(env.CAL_DEMO_PATH / '2.cornet_detect.png'),
-        U8(corner)
+        cvtb.types.U8(corner)
     )
     cv.imwrite(
         str(env.CAL_DEMO_PATH / '3.undistort.png'),
-        U8(undist)
+        cvtb.types.U8(undist)
     )
     # undistortion result
     undistorted = Undistort.apply(bri_corrected, mtx, dist, crop)
     # output checkers to data path
     cv.imwrite(
         str(env.CAL_DEMO_PATH / '4.result.png'),
-        U8(undistorted)
+        cvtb.types.U8(undistorted)
     )
 
 
@@ -72,7 +72,7 @@ def run_calibrate(img_path):
     if getHyperCamInfo("rotation", int) == 180:
         undistorted = undistorted[::-1, ::-1]
     # Save image
-    cv.imwrite(str(SAVE_PATH / basename(img_path)), U16(undistorted))
+    cv.imwrite(str(SAVE_PATH / basename(img_path)), cvtb.types.U16(undistorted))
 
 
 def get_gridView(id):

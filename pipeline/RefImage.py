@@ -4,15 +4,14 @@ import env
 from os.path import basename
 import warnings
 # PIP Packages
+import cvtb
 import numpy as np
 from numpy.typing import NDArray as NPA
 import cv2 as cv
 import spectral.io.envi as envi
 # User libraries
 from util.info import INFO
-from util.convert import REF2BGR, REF2GRAY, U8
-from util.transform import equalizeGeo
-from util.util import gamma
+from util.convert import REF2BGR, REF2GRAY
 getInfo = INFO("RawImage.Reference")
 SAVE_PATH = env.REF_CAL_PATH
 U8C1_PATH = env.ensureDir(SAVE_PATH / "U8C1")
@@ -35,24 +34,23 @@ def init(path):
     # Load from .hdr and .dat files
     cube = load(name)
     # Equalize brightness distribution (if configured)
-    cube = equalizeGeo(cube, kernelSize)
+    cube = cvtb.geometric.equalize(kernelSize)(cube)
     # Save as numpy
     np.save(SAVE_PATH / name, cube)
     # Generate fake color image
     cv.imwrite(
         str(SAVE_PATH / f"{name}.png"),
-        REF2BGR(cube)
+        cvtb.types.U8(REF2BGR(cube))
     )
     # Generate GrayScale NPY for matching
     gray = REF2GRAY(cube)
     gray *= 0.5 / np.average(gray)
-    gray = gamma(gray, 2)
+    gray = cvtb.histogram.gamma(2)(gray)
     gray *= 0.5 / np.average(gray)
-    gray = U8(gray)
     np.save(U8C1_PATH / name, gray)
     cv.imwrite(
         str(U8C1_PATH / f"{name}.png"),
-        gray
+        cvtb.types.U8(gray)
     )
 
 

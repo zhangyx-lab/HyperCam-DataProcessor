@@ -1,8 +1,5 @@
 # Yuxuan Zhang, University of Florida
 from collections import namedtuple
-from numpy import uint16 as DTYPE, array
-# Caculate max value of given dtype
-DTYPE_MAX, = ~array([0], dtype=DTYPE)
 # Color profiles for our camera
 COLORS = [
     "Ultra_Violet", # 0

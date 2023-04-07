@@ -1,21 +1,22 @@
 # PIP packages
+import cvtb
 import cv2 as cv
 import numpy as np
 # Project Packages
 import env
 from param import LED_LIST
-from util.util import pad, draw_text, wave2bgr, gamma, getIdList, loadStack
-from util.convert import F32, U8, OUR2BGR, scaleToFit
+from util.util import getIdList, loadStack
+from util.convert import OUR2BGR
 RGB_SAVE_PATH = env.ensureDir(env.GRID_VIEW_PATH / "RGB")
 GRID_SAVE_PATH = env.ensureDir(env.GRID_VIEW_PATH / "GRIDS")
 
 
 def apply(stack, path):
-    stack = U8(stack).copy()
+    stack = cvtb.types.U8(stack).copy()
     # Generate color RGB image
     cv.imwrite(
         str(RGB_SAVE_PATH / path),
-        U8(OUR2BGR(stack))
+        cvtb.types.U8(OUR2BGR(stack))
     )
     # Generate fake color grids
     MARGIN = 128
@@ -25,22 +26,23 @@ def apply(stack, path):
     for i in range(len(stack)):
         name, wavelength, delta = LED_LIST[i]
         title = "{} ({} ~ {} nm)".format(name, wavelength, delta)
-        color = F32(wave2bgr(wavelength))
+        color = cvtb.types.F32(cvtb.spectral.wave2bgr(wavelength))
         # Generate layer slices
-        layer = F32(np.stack([stack[i]] * 3, axis=2))
+        layer = cvtb.types.F32(np.stack([stack[i]] * 3, axis=2))
         layer = layer * 0.5 / np.average(layer)
-        layer = gamma(layer, 2)
+        layer = cvtb.histogram.gamma(2)(layer)
         layer = layer * 0.5 / np.average(layer)
         layer = layer * color
-        layer = pad(U8(layer), h=H+2*MARGIN, w=W+MARGIN)[MARGIN:]
+        layer = cvtb.misc.pad(MARGIN, top=0)(layer)
         # Put suffix text
         t_color = np.minimum(color, 100 * color / np.average(color))
-        B, G, R = U8(t_color)
-        stack[i] = draw_text(
-            layer, title, color=(B, G, R),
+        B, G, R = cvtb.types.U8(t_color)
+        text = cvtb.misc.text(
+            color=(B, G, R),
             scale=2, width=3,
             pos=(int(MARGIN/2), layer.shape[0] - int(MARGIN/2))
         )
+        stack[i] = text(cvtb.types.U8(layer), title)
     # Concatenate all grids
     img = np.concatenate([
         np.concatenate(stack[:4], axis=1),
@@ -48,11 +50,11 @@ def apply(stack, path):
     ], axis=0)
     # Pad Outer Frame
     H, W, D = img.shape
-    img = pad(img, h=H+2*MARGIN, w=W+MARGIN)[:-MARGIN, MARGIN:-MARGIN]
+    img = cvtb.misc.pad(top=MARGIN)(img)
     # Save
     cv.imwrite(
         str(GRID_SAVE_PATH / path),
-        U8(img, scaleToFit)
+        cvtb.types.U8(img, cvtb.types.scaleToFit)
     )
 
 

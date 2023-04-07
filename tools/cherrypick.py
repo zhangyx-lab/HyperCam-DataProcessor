@@ -1,6 +1,7 @@
 from glob import glob
 from os.path import basename, exists
 # PIP Packages
+import cvtb
 import cv2
 import numpy as np
 # Project Includes
@@ -83,7 +84,8 @@ def selection(c):
     W = w * 10
     img = cv2.resize(img, (W, h), interpolation=cv2.INTER_NEAREST)
     im2 = ~np.zeros((60, W, _), img.dtype)
-    im2 = util.draw_text(im2, text, color=[0] * 3, scale=2, width=2)
+    draw_text = cvtb.misc.text(color=[0] * 3, scale=2, width=2)
+    im2 = draw_text(im2, text)
     return np.concatenate([im2, img], axis=0)
 
 

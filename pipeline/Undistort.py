@@ -3,6 +3,7 @@
 import sys
 from os.path import exists
 # PIP Packages
+import cvtb
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
@@ -10,8 +11,6 @@ import matplotlib.pyplot as plt
 import env
 from util.info import INFO, runtime_info, runtime_log
 from util.util import rdGray
-from util.convert import U8
-from param import DTYPE, DTYPE_MAX
 # global variable
 CAM_MTX_PATH = env.CAL_CHECKER_PATH / "CAM_MTX.npy"
 mtx = np.load(CAM_MTX_PATH) if exists(CAM_MTX_PATH) else None
@@ -35,7 +34,7 @@ def getCorners(img, grid=GRID, criteria=CRITERIA):
     if img.dtype == np.uint16:
         img = (img >> 8).astype(np.uint8)
     # Convert data type
-    img = U8(img)
+    img = cvtb.types.U8(img)
     # Match corners
     ret, corners = cv.findChessboardCorners(img, grid, None)
     if ret != True:
@@ -146,7 +145,7 @@ def init(SHOW_WINDOW=False):
 
 def demoUndistort(img, mtx=mtx, dist=dist, crop=crop):
     # Convert to uint8
-    img = U8(img)
+    img = cvtb.types.U8(img)
     # Convert to RGB
     if len(img.shape) < 3:
         img = np.stack([img[:, :]] * 3, axis=2)
