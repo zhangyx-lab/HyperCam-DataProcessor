@@ -5,13 +5,20 @@ from param import REF_BANDS, LED_LIST
 import util.util as util
 
 
-def post_process_bgr(bgr: NDArray):
-    return cvtb.types.scaleToFitDR(bgr)
+BGR = [466, 520, 600]
+
+
+def post_process_bgr(bgr: NDArray, callback):
+    bgr = np.stack([
+        callback(cube, b, 3) for b in BGR
+    ], axis=2)
+    bgr = cvtb.types.scaleToFitDR(bgr, [0.01, 0.99])
+    return bgr
     # FROM REF
     # Match the band number with the LED module
     bgr = np.stack([
         gamma(
-            REF2BAND(cube, LED_LIST[i].bandwidth, LED_LIST[i].delta / 10), g)
+            REF2BAND(cube, LED_LIST[i].bandwidth, 1), g)
         for i, g in zip([1, 2, 6], [1.15, 1.18, 1.55])
     ], axis=2)
     bgr *= 0.3 / np.average(bgr)
@@ -29,11 +36,7 @@ def REF2BAND(cube: NDArray[np.float32], band: float, sigma: float = 1):
 
 
 def REF2BGR(cube: NDArray[np.float32]):
-    bgr = np.stack([
-        REF2BAND(cube, LED_LIST[i].bandwidth, LED_LIST[i].delta / 10)
-        for i in [1, 2, 6]
-    ], axis=2)
-    return post_process_bgr(bgr)
+    return post_process_bgr(cube, REF2BAND)
 
 
 REF2GRAY = cvtb.spectral.gray(
@@ -50,11 +53,7 @@ def OUR2BAND(cube: NDArray[np.float32], band: float, sigma: float = 1):
 
 
 def OUR2BGR(cube: NDArray):
-    bgr = np.stack([
-        OUR2BAND(cube, LED_LIST[i].bandwidth, LED_LIST[i].delta / 10)
-        for i in [1, 2, 6]
-    ], axis=2)
-    return post_process_bgr(bgr)
+    return post_process_bgr(cube, OUR2BAND)
 
 
 OUR2GRAY = cvtb.spectral.gray()
